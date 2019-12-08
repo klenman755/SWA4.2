@@ -1,0 +1,136 @@
+<html>
+<head>
+ 
+  <script>
+    let ws
+    const value = selector => document.querySelector(selector).value
+    
+    var map = new Object();
+    var time ;
+    var subscribed = false;
+    var change = "" ;
+    var minimalSeverity =0;
+    handleSubsription(); 
+    
+    function handleSubsription(){
+      ws = new WebSocket("ws://localhost:8090/warnings")
+      ws.onopen = () => {
+        const message = 'subscribe'
+        ws.send(message)
+        
+      }
+      ws.onmessage = function (event) {
+        
+        
+        if(subscribed===false){
+          var data = JSON.parse(event.data);
+          time = data.time
+          
+          data.warnings.forEach(function(element){
+
+           if(element.severity!=0){
+             map[element.id] = element ;  
+           }
+         });  
+          subscribed = true;
+        }
+        else{
+          document.getElementById("changes").value = "";
+          
+          var data  = JSON.parse(event.data);
+          console.log(event.data)
+          if(data.severity>=minimalSeverity){
+            if(map[data.id] !=null){
+              change = "Last change: data on id " + data.id;
+              
+              if(data.severity ===0){
+                delete map[data.id];
+                change = change + " was deleted"
+              }else{
+                map[data.id] = data;
+                change = change + " was updated"
+              }
+              
+              
+            }
+            else{
+              if(data.severity !=0){
+                map[data.id] = data;
+                change = "data on id " + data.id +" was added"
+              }
+            }}
+          }
+          
+          
+          
+          
+          
+          var node= document.querySelector('#messages');
+          node.querySelectorAll('*').forEach(n => n.remove());
+          const timeOfEvent = document.createElement('li');
+          timeOfEvent.innerText = time;
+          document.querySelector('#messages').appendChild(timeOfEvent);
+          const keys = Object.keys(map);
+          keys.forEach(function(element){
+            const warningEntry = document.createElement('li'); 
+            warningEntry.innerText = "id: " + map[element].id + "\n";
+            warningEntry.innerText = warningEntry.innerText +"\n prediction :from: " + map[element].prediction.from + " place: " + map[element].prediction.place+" time: " + map[element].prediction.time+" to: "+ map[element].prediction.to + " type: " + map[element].prediction.type+ " unit: " + map[element].prediction.unit;
+            if(map[element].prediction.directions !=null){
+              warningEntry.innerText = warningEntry.innerText +  ' directions:';  
+              map[element].prediction.directions.forEach(function(extraElement){
+                warningEntry.innerText = warningEntry.innerText + " " + extraElement; 
+              });
+            }
+            if(map[element].prediction.precipitation_types !=null){
+              warningEntry.innerText = warningEntry.innerText +  ' precipitation types:'; 
+              map[element].prediction.precipitation_types.forEach(function(extraElement){
+                warningEntry.innerText = warningEntry.innerText + " " + extraElement; 
+              });
+            }
+            
+            warningEntry.innerText = warningEntry.innerText + "severity: " + map[element].severity;
+            document.querySelector('#messages').appendChild(warningEntry) });
+          if(change !=null){
+           
+           document.getElementById("changes").value = change
+           
+           change = null;
+         }
+       }
+       
+     }  
+     
+     
+     
+     
+     window.setSeverity= () =>{
+      minimalSeverity = value('#minSeverity')
+    }
+    window.switchSubscription= () =>{
+      if(subscribed ===true ){
+       const message = 'unsubscribe'
+       ws.send(message)
+       subscribed=false
+     }else {
+      handleSubsription()
+      var map = new Object();
+      subscribed=true
+    } 
+  }
+  
+</script>
+</head>
+<body>
+
+ <div id='warnings'>
+  <ul id = 'messages'></ul>
+  <textArea id ='changes'></textArea>
+  
+</div>  
+<div id='severitySet'>
+ <input type="text" id="minSeverity"><br>
+ <button onclick='setSeverity()'>Set Severity</button>
+</div>  
+<button id="subButton" onclick='switchSubscription()'>Subscribe/Unsubscribe</button>
+</body>
+</html>
